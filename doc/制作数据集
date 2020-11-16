@@ -1,0 +1,33 @@
+1、生成tfrecords文件
+#新建一个writer
+writer=tf.python_io.TFRecordWriter(tfRecordName)
+for 循环遍历每张图和标签:
+    #把每张图片和标签封装到example
+    example=tf.train.Example(features=tf.train.Features(feature={
+        'img_raw':tf.train.Feature(bytes_list=tf.train.BytesList(value=[img_raw])),
+        'label':tf.train.Feature(int64_list=tf.train.Int64List(value=labels))
+    }))
+    #把example进行序列化
+    writer.write(example.SerializeToString())
+writer.close()
+
+2、解析tfrecords文件
+filename_queue=tf.train.string_input_producer(tfRecord_path)
+#新建一个reader
+reader=tf.TFRecordReader()
+_,serialized_example=reader.read(filename_queue)
+features=tf.parse_single_example(serialized_example,features={
+    'img_raw':tf.FixedLenFeature([],tf.string),
+    'label':tf.FixedLenFeature([10],tf.int64)
+})
+img=tf.decode_raw(features['img_raw'],tf.uint8)
+img.set_shape([784])
+img=tf.cast(img,tf.float32)*(1./255)
+label=tf.cast(features['label'],tf.float32)
+
+自定义数据集
+前向传播
+反向传播
+测试程序
+应用程序
+数据集生成读取   mnist_generateds.py
