@@ -2,6 +2,7 @@
 import tensorflow as tf
 import tensorflow.examples.tutorials.mnist.input_data as input_data
 import study.mnist_module.mnist_forward as forward
+import study.mnist_module.mnist_generateds as mnist_generateds
 import os
 
 BATCH_SIZE = 200
@@ -12,9 +13,11 @@ STEPS = 50000
 MOVING_AVERAGE_DECAY = 0.99
 MODEL_SAVE_PATH = "c:/data/models/"
 MODEL_NAME = "mnist_model"
+# 训练的总样本数是60000
+train_num_examples = 60000
 
 
-def backward(mnist):
+def backward():
     x = tf.placeholder(tf.float32, [None, forward.INPUT_NODE])
     y_ = tf.placeholder(tf.float32, [None, forward.OUTPUT_NODE])
     y = forward.forward(x, REGULARIZER)
@@ -30,7 +33,7 @@ def backward(mnist):
     learning_rate = tf.train.exponential_decay(
         LEARNING_RATE_BASE,
         global_step,
-        mnist.train.num_examples / BATCH_SIZE,
+        train_num_examples / BATCH_SIZE,
         LEARNING_RATE_DECAY,
         staircase=True)
     # 定义训练过程
@@ -45,6 +48,9 @@ def backward(mnist):
     # 实例化saver
     saver = tf.train.Saver()
 
+    # 新增 批量获取图片，标签
+    img_batch, label_batch = mnist_generateds.get_tfrecord(BATCH_SIZE, isTrain=True)
+
     with tf.Session() as sess:
         # 初始化所有变量
         init_op = tf.global_variables_initializer()
@@ -55,12 +61,23 @@ def backward(mnist):
         if ckpt and ckpt.model_checkpoint_path:
             saver.restore(sess, ckpt.model_checkpoint_path)
 
+        # 增加线程协调器代码
+        coord = tf.train.Coordinator()
+        threads = tf.train.start_queue_runners(sess=sess, coord=coord)
+
         for i in range(STEPS):
-            xs, ys = mnist.train.next_batch(BATCH_SIZE)
+            # 旧代码 xs, ys = mnist.train.next_batch(BATCH_SIZE)
+            # 新增代码
+            # xs, ys = sess.run(img_batch, label_batch)
+            xs, ys = sess.run([img_batch, label_batch])
+
             _, loss_value, step = sess.run([train_op, loss, global_step], feed_dict={x: xs, y_: ys})
             if i % 1000 == 0:
                 print("After %d training step(s),loss on training batch is %g." % (step, loss_value))
                 saver.save(sess, os.path.join(MODEL_SAVE_PATH, MODEL_NAME), global_step=global_step)
+        # 线程停止
+        coord.request_stop()
+        coord.join(threads)
 
 
 def main():
